@@ -423,11 +423,67 @@ function classifyDocumentKind(title: string, mimeType?: string): DocKind {
 }
 
 /**
+ * MIME type mapping for common file extensions
+ */
+const MIME_TYPES: Record<string, string> = {
+  // Documents
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.txt': 'text/plain',
+  '.rtf': 'application/rtf',
+  '.csv': 'text/csv',
+  // Images
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  // CAD files
+  '.dwg': 'image/vnd.dwg',
+  '.dxf': 'image/vnd.dxf',
+  '.step': 'application/step',
+  '.stp': 'application/step',
+  '.iges': 'model/iges',
+  '.igs': 'model/iges',
+  '.stl': 'model/stl',
+  // Other technical formats
+  '.xml': 'application/xml',
+  '.json': 'application/json',
+  '.html': 'text/html',
+  '.htm': 'text/html',
+};
+
+/**
+ * Get MIME type from file extension
+ */
+function getMimeType(filename: string): string {
+  const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || '';
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+/**
  * Extract embedded document files from AASX package
  */
 async function extractEmbeddedDocuments(zip: JSZip): Promise<AasDocument[]> {
   const docs: AasDocument[] = [];
-  const docExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+  // Expanded list of supported extensions
+  const docExtensions = [
+    // Documents
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.csv',
+    // Images (excluding thumbnails)
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp', '.tif', '.tiff',
+    // CAD files
+    '.dwg', '.dxf', '.step', '.stp', '.iges', '.igs', '.stl',
+  ];
   const promises: Promise<void>[] = [];
 
   zip.forEach((path, entry) => {
@@ -436,14 +492,17 @@ async function extractEmbeddedDocuments(zip: JSZip): Promise<AasDocument[]> {
     const lowerPath = path.toLowerCase();
     const isDocument = docExtensions.some((ext) => lowerPath.endsWith(ext));
 
-    // Skip thumbnails and small images
-    if (lowerPath.includes('thumbnail') || lowerPath.endsWith('.png') || lowerPath.endsWith('.jpg')) {
+    // Skip thumbnail files (but allow other images)
+    if (lowerPath.includes('thumbnail') || lowerPath.includes('typthumb')) {
       return;
     }
 
     if (isDocument) {
-      const promise = entry.async('blob').then((blob) => {
+      const promise = entry.async('arraybuffer').then((arrayBuffer) => {
         const filename = path.split('/').pop() || path;
+        const mimeType = getMimeType(filename);
+        // Create Blob with proper MIME type
+        const blob = new Blob([arrayBuffer], { type: mimeType });
         docs.push({
           title: formatFilename(filename),
           url: `aasx:${path}`,
