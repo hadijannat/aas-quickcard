@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AAS QuickCard Options</title>
+  <link rel="stylesheet" href="./options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>AAS QuickCard Options</h1>
+      <p class="subtitle">Configure field mappings and preferences</p>
+    </header>
+
+    <main class="main">
+      <!-- Default Role Section -->
+      <section class="section">
+        <h2>Default Role</h2>
+        <p class="description">Choose the default role when the extension opens.</p>
+        <select id="default-role" class="select">
+          <option value="operator">Operator</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="quality">Quality</option>
+          <option value="procurement">Procurement</option>
+        </select>
+      </section>
+
+      <!-- Field Mappings Section -->
+      <section class="section">
+        <h2>Field Mappings</h2>
+        <p class="description">
+          Configure which JSON property names map to each field.
+          Enter multiple property names separated by commas.
+          The first matching property will be used.
+        </p>
+
+        <div class="field-group">
+          <label for="map-displayName">Display Name</label>
+          <input type="text" id="map-displayName" class="input"
+            placeholder="ManufacturerProductDesignation, productDesignation, displayName">
+          <span class="hint">The main name shown for the asset</span>
+        </div>
+
+        <div class="field-group">
+          <label for="map-manufacturer">Manufacturer</label>
+          <input type="text" id="map-manufacturer" class="input"
+            placeholder="ManufacturerName, manufacturer, companyName">
+          <span class="hint">The manufacturer or vendor name</span>
+        </div>
+
+        <div class="field-group">
+          <label for="map-serialNumber">Serial Number</label>
+          <input type="text" id="map-serialNumber" class="input"
+            placeholder="SerialNumber, serialNumber">
+          <span class="hint">The unique serial number</span>
+        </div>
+
+        <div class="field-group">
+          <label for="map-productDesignation">Product Designation</label>
+          <input type="text" id="map-productDesignation" class="input"
+            placeholder="ManufacturerProductDesignation, ProductDesignation">
+          <span class="hint">The product type or model designation</span>
+        </div>
+
+        <div class="field-group">
+          <label for="map-assetId">Asset ID</label>
+          <input type="text" id="map-assetId" class="input"
+            placeholder="globalAssetId, assetId, id">
+          <span class="hint">The global asset identifier (IRI)</span>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="actions">
+        <button id="btn-reset" class="btn btn-secondary">Reset to Defaults</button>
+        <button id="btn-save" class="btn btn-primary">Save Settings</button>
+      </section>
+
+      <!-- Status -->
+      <div id="status" class="status hidden"></div>
+    </main>
+
+    <footer class="footer">
+      <p>AAS QuickCard v1.0.0</p>
+      <p><a href="https://github.com/hadijannat/aas-quickcard" target="_blank">Documentation</a></p>
+    </footer>
+  </div>
+
+  <script type="module" src="./options.ts"></script>
+</body>
+</html>

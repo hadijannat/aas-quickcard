@@ -1,0 +1,32 @@
+{
+  "name": "aas-quickcard",
+  "version": "1.0.0",
+  "description": "Chrome extension that turns AAS JSON into human-friendly equipment cards",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "check-rhc": "node scripts/check-rhc.mjs",
+    "validate-manifest": "node scripts/validate-manifest.mjs",
+    "pack": "node scripts/pack-zip.mjs",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12"
+  },
+  "keywords": [
+    "chrome-extension",
+    "aas",
+    "asset-administration-shell",
+    "industry-4.0"
+  ],
+  "license": "MIT"
+}

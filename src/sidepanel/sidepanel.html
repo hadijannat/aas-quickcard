@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AAS QuickCard</title>
+  <link rel="stylesheet" href="./sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="header-title">AAS QuickCard</h1>
+      <div class="header-actions">
+        <button id="btn-options" class="icon-btn" title="Options" aria-label="Options">
+          ⚙️
+        </button>
+        <button id="btn-help" class="icon-btn" title="Help" aria-label="Help">
+          ❓
+        </button>
+      </div>
+    </header>
+
+    <!-- Action Buttons -->
+    <section class="actions-section">
+      <div class="action-buttons">
+        <button id="btn-read-page" class="action-btn primary">
+          📖 Read this page
+        </button>
+        <button id="btn-upload-aasx" class="action-btn">
+          📦 Upload .aasx
+        </button>
+        <button id="btn-paste-json" class="action-btn">
+          📋 Paste JSON
+        </button>
+        <button id="btn-demo-mode" class="action-btn">
+          🎯 Demo Mode
+        </button>
+      </div>
+      <input type="file" id="file-input" accept=".aasx,.json" hidden>
+    </section>
+
+    <!-- Role Selector -->
+    <section class="role-section">
+      <label for="role-select" class="role-label">Role:</label>
+      <select id="role-select" class="role-select">
+        <option value="operator">Operator</option>
+        <option value="maintenance" selected>Maintenance</option>
+        <option value="quality">Quality</option>
+        <option value="procurement">Procurement</option>
+      </select>
+    </section>
+
+    <!-- Status/Loading -->
+    <div id="status-area" class="status-area hidden">
+      <div class="spinner"></div>
+      <span id="status-text">Loading...</span>
+    </div>
+
+    <!-- Error Display -->
+    <div id="error-area" class="error-area hidden">
+      <span id="error-text"></span>
+      <button id="btn-dismiss-error" class="dismiss-btn">×</button>
+    </div>
+
+    <!-- Main Content (shown when data loaded) -->
+    <main id="main-content" class="main-content hidden">
+      <!-- Asset Card -->
+      <section id="asset-card" class="card asset-card">
+        <h2 id="asset-name" class="asset-name">-</h2>
+        <div class="asset-details">
+          <div class="detail-row">
+            <span class="detail-label">Manufacturer:</span>
+            <span id="asset-manufacturer" class="detail-value">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Serial:</span>
+            <span id="asset-serial" class="detail-value">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Asset ID:</span>
+            <span id="asset-id" class="detail-value asset-id-value">-</span>
+          </div>
+        </div>
+        <div class="asset-actions">
+          <button id="btn-copy-id" class="small-btn" title="Copy Asset ID">
+            📋 Copy ID
+          </button>
+          <button id="btn-copy-link" class="small-btn" title="Copy Source Link">
+            🔗 Copy Link
+          </button>
+          <button id="btn-pin" class="small-btn" title="Pin to Favorites">
+            ⭐ Pin
+          </button>
+          <button id="btn-qr" class="small-btn" title="Generate QR Label">
+            📱 QR Label
+          </button>
+        </div>
+      </section>
+
+      <!-- Documents Section -->
+      <section id="documents-section" class="card">
+        <div class="section-header">
+          <h3 class="section-title">📄 Documents (<span id="docs-count">0</span>)</h3>
+          <input type="search" id="docs-search" class="search-input" placeholder="Search...">
+        </div>
+        <ul id="documents-list" class="documents-list">
+          <!-- Documents populated dynamically -->
+        </ul>
+        <p id="no-docs" class="empty-message hidden">No documents found</p>
+      </section>
+
+      <!-- Contacts Section -->
+      <section id="contacts-section" class="card">
+        <h3 class="section-title">📞 Contacts (<span id="contacts-count">0</span>)</h3>
+        <ul id="contacts-list" class="contacts-list">
+          <!-- Contacts populated dynamically -->
+        </ul>
+        <p id="no-contacts" class="empty-message hidden">No contacts found</p>
+      </section>
+
+      <!-- Footer Actions -->
+      <section class="footer-actions">
+        <button id="btn-copy-ticket" class="action-btn full-width">
+          📋 Copy Support Ticket Text
+        </button>
+      </section>
+    </main>
+
+    <!-- Favorites Panel -->
+    <section id="favorites-section" class="card favorites-section hidden">
+      <h3 class="section-title">⭐ Favorites</h3>
+      <ul id="favorites-list" class="favorites-list">
+        <!-- Favorites populated dynamically -->
+      </ul>
+      <p id="no-favorites" class="empty-message">No favorites yet. Pin assets to access them quickly.</p>
+    </section>
+
+    <!-- Paste JSON Modal -->
+    <div id="paste-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Paste AAS JSON</h3>
+        <textarea id="paste-textarea" class="paste-textarea" placeholder="Paste AAS JSON here..."></textarea>
+        <div class="modal-actions">
+          <button id="btn-paste-cancel" class="action-btn">Cancel</button>
+          <button id="btn-paste-submit" class="action-btn primary">Parse</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Modal -->
+    <div id="qr-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>QR Label</h3>
+        <div id="qr-container" class="qr-container"></div>
+        <div class="modal-actions">
+          <button id="btn-qr-close" class="action-btn">Close</button>
+          <button id="btn-qr-download" class="action-btn primary">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./sidepanel.ts"></script>
+</body>
+</html>

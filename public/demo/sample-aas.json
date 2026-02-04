@@ -1,0 +1,196 @@
+{
+  "assetAdministrationShells": [
+    {
+      "idShort": "ACME_IndustrialPump_AAS",
+      "id": "https://example.com/aas/pump/12345",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "https://example.com/assets/pump/SN-2024-12345"
+      },
+      "submodels": [
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "https://example.com/submodels/nameplate/12345"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "https://example.com/submodels/documentation/12345"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "idShort": "Nameplate",
+      "id": "https://example.com/submodels/nameplate/12345",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "https://admin-shell.io/zvei/nameplate/2/0/Nameplate"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "idShort": "ManufacturerName",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "ACME Industrial Corp"
+        },
+        {
+          "idShort": "ManufacturerProductDesignation",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "ACME HydroPump Pro 3000"
+        },
+        {
+          "idShort": "SerialNumber",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "SN-2024-12345"
+        },
+        {
+          "idShort": "YearOfConstruction",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "2024"
+        },
+        {
+          "idShort": "ContactInformation",
+          "modelType": "SubmodelElementCollection",
+          "value": [
+            {
+              "idShort": "Phone",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "+1-800-ACME-PUMP"
+            },
+            {
+              "idShort": "Email",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "support@acme-industrial.example.com"
+            },
+            {
+              "idShort": "Website",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "https://acme-industrial.example.com/support"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "idShort": "Documentation",
+      "id": "https://example.com/submodels/documentation/12345",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "https://admin-shell.io/vdi/2770/1/0/DocumentationSubmodel"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "idShort": "UserManual",
+          "modelType": "File",
+          "contentType": "application/pdf",
+          "value": "https://acme-industrial.example.com/docs/hydropump-3000-manual.pdf"
+        },
+        {
+          "idShort": "SafetyDataSheet",
+          "modelType": "File",
+          "contentType": "application/pdf",
+          "value": "https://acme-industrial.example.com/docs/hydropump-3000-safety.pdf"
+        },
+        {
+          "idShort": "TechnicalDatasheet",
+          "modelType": "File",
+          "contentType": "application/pdf",
+          "value": "https://acme-industrial.example.com/docs/hydropump-3000-datasheet.pdf"
+        },
+        {
+          "idShort": "CECertificate",
+          "modelType": "File",
+          "contentType": "application/pdf",
+          "value": "https://acme-industrial.example.com/docs/hydropump-3000-ce-cert.pdf"
+        },
+        {
+          "idShort": "InstallationGuide",
+          "modelType": "File",
+          "contentType": "application/pdf",
+          "value": "https://acme-industrial.example.com/docs/hydropump-3000-installation.pdf"
+        }
+      ]
+    },
+    {
+      "idShort": "TechnicalData",
+      "id": "https://example.com/submodels/technical/12345",
+      "submodelElements": [
+        {
+          "idShort": "MaxFlowRate",
+          "modelType": "Property",
+          "valueType": "xs:double",
+          "value": "500",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "0173-1#02-AAB381#007"
+              }
+            ]
+          }
+        },
+        {
+          "idShort": "MaxPressure",
+          "modelType": "Property",
+          "valueType": "xs:double",
+          "value": "16",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "0173-1#02-AAB382#005"
+              }
+            ]
+          }
+        },
+        {
+          "idShort": "PowerRating",
+          "modelType": "Property",
+          "valueType": "xs:double",
+          "value": "7.5"
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": [
+    {
+      "idShort": "ManufacturerName",
+      "id": "0173-1#02-AAO677#002",
+      "description": [
+        {
+          "language": "en",
+          "text": "Legally valid designation of the natural or judicial body which is directly responsible for the design, production, packaging and labeling of a product in respect to its being brought into the market"
+        }
+      ]
+    }
+  ]
+}
