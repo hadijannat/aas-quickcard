@@ -141,6 +141,15 @@
     {
       "idShort": "TechnicalData",
       "id": "https://example.com/submodels/technical/12345",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "https://admin-shell.io/ZVEI/TechnicalData/Submodel/1/2"
+          }
+        ]
+      },
       "submodelElements": [
         {
           "idShort": "MaxFlowRate",
@@ -177,6 +186,189 @@
           "modelType": "Property",
           "valueType": "xs:double",
           "value": "7.5"
+        },
+        {
+          "idShort": "LifeCyclePhase",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "Operation"
+        }
+      ]
+    },
+    {
+      "idShort": "CarbonFootprint",
+      "id": "https://example.com/submodels/pcf/12345",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "https://admin-shell.io/idta/CarbonFootprint/ProductCarbonFootprint/1/0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "idShort": "PCFGWPTotal",
+          "modelType": "Property",
+          "valueType": "xs:double",
+          "value": "245.8"
+        },
+        {
+          "idShort": "PCFGWPUnit",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "kg CO2e"
+        },
+        {
+          "idShort": "CalculationMethod",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "ISO 14067"
+        },
+        {
+          "idShort": "Scope",
+          "modelType": "Property",
+          "valueType": "xs:string",
+          "value": "Cradle-to-Gate"
+        },
+        {
+          "idShort": "ValidFrom",
+          "modelType": "Property",
+          "valueType": "xs:date",
+          "value": "2024-01-01"
+        },
+        {
+          "idShort": "ValidTo",
+          "modelType": "Property",
+          "valueType": "xs:date",
+          "value": "2025-12-31"
+        }
+      ]
+    },
+    {
+      "idShort": "SpareParts",
+      "id": "https://example.com/submodels/spareparts/12345",
+      "submodelElements": [
+        {
+          "idShort": "MechanicalSeal",
+          "modelType": "SubmodelElementCollection",
+          "value": [
+            {
+              "idShort": "PartNumber",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "ACME-SEAL-3000-A"
+            },
+            {
+              "idShort": "Description",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Mechanical shaft seal, silicon carbide"
+            },
+            {
+              "idShort": "Category",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Wear"
+            },
+            {
+              "idShort": "Quantity",
+              "modelType": "Property",
+              "valueType": "xs:int",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "idShort": "ImpellerKit",
+          "modelType": "SubmodelElementCollection",
+          "value": [
+            {
+              "idShort": "PartNumber",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "ACME-IMP-3000-SS"
+            },
+            {
+              "idShort": "Description",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Stainless steel impeller assembly"
+            },
+            {
+              "idShort": "Category",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Replacement"
+            },
+            {
+              "idShort": "Quantity",
+              "modelType": "Property",
+              "valueType": "xs:int",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "idShort": "OilFilter",
+          "modelType": "SubmodelElementCollection",
+          "value": [
+            {
+              "idShort": "PartNumber",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "ACME-FLT-OIL-10"
+            },
+            {
+              "idShort": "Description",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Lubricant oil filter, 10 micron"
+            },
+            {
+              "idShort": "Category",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Consumable"
+            },
+            {
+              "idShort": "Quantity",
+              "modelType": "Property",
+              "valueType": "xs:int",
+              "value": "2"
+            }
+          ]
+        },
+        {
+          "idShort": "BearingSet",
+          "modelType": "SubmodelElementCollection",
+          "value": [
+            {
+              "idShort": "PartNumber",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "ACME-BRG-6208-2RS"
+            },
+            {
+              "idShort": "Description",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Deep groove ball bearing set"
+            },
+            {
+              "idShort": "Category",
+              "modelType": "Property",
+              "valueType": "xs:string",
+              "value": "Wear"
+            },
+            {
+              "idShort": "Quantity",
+              "modelType": "Property",
+              "valueType": "xs:int",
+              "value": "2"
+            }
+          ]
         }
       ]
     }
