@@ -10,6 +10,7 @@
     "check-rhc": "node scripts/check-rhc.mjs",
     "validate-manifest": "node scripts/validate-manifest.mjs",
     "pack": "node scripts/pack-zip.mjs",
+    "prepack": "npm run build && npm run check-rhc && npm run validate-manifest",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.260",
     "@types/qrcode": "^1.5.5",
+    "puppeteer": "^24.36.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.12"
   },

@@ -54,6 +54,29 @@ const VIOLATION_PATTERNS = [
     description: 'CDN URL reference',
     severity: 'warning',
   },
+  // setTimeout/setInterval with string argument (dynamic code execution)
+  {
+    pattern: /setTimeout\s*\(\s*["'`]/g,
+    description: 'setTimeout with string argument (dynamic code execution)',
+    severity: 'error',
+  },
+  {
+    pattern: /setInterval\s*\(\s*["'`]/g,
+    description: 'setInterval with string argument (dynamic code execution)',
+    severity: 'error',
+  },
+  // Worker from Blob (can execute arbitrary code)
+  {
+    pattern: /new\s+Worker\s*\(\s*URL\.createObjectURL\s*\(/g,
+    description: 'Worker from Blob URL (dynamic code execution)',
+    severity: 'error',
+  },
+  // importScripts in workers (can load external scripts)
+  {
+    pattern: /importScripts\s*\(\s*["']https?:\/\//gi,
+    description: 'importScripts from external URL',
+    severity: 'error',
+  },
 ];
 
 // Files to scan

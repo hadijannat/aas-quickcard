@@ -125,41 +125,6 @@ function sortFavorites(favorites: FavoriteAsset[], sort: SortOption): FavoriteAs
 }
 
 /**
- * Highlight matching text in a string
- * Returns HTML string with <mark> tags around matches
- */
-export function highlightMatches(text: string, query: string): string {
-  if (!query || !text) return escapeHtml(text);
-
-  const queryTerms = query.toLowerCase().split(/\s+/);
-  let result = text;
-
-  for (const term of queryTerms) {
-    if (!term) continue;
-    const regex = new RegExp(`(${escapeRegex(term)})`, 'gi');
-    result = result.replace(regex, '<mark>$1</mark>');
-  }
-
-  return result;
-}
-
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
- * Escape regex special characters
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * Quick search with just text query
  */
 export async function quickSearch(query: string): Promise<FavoriteAsset[]> {
