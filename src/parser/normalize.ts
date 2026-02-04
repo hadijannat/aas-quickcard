@@ -1,5 +1,8 @@
 import type { AasSnapshot, AasSource, AasAsset, AasDocument, AasContact, FieldMapping } from '../shared/types';
-import { extractField, findDocumentReferences, findContacts } from './heuristics';
+import { extractField, findDocumentReferences, findContacts, findLifecyclePhase, findCommissioningDate, findLastServiceDate } from './heuristics';
+import { extractSubmodels } from './submodelRecognizer';
+import { extractPcfData } from './pcfExtractor';
+import { extractSpareParts } from './sparePartsExtractor';
 
 /**
  * Normalize raw AAS JSON into a unified AasSnapshot structure.
@@ -32,6 +35,12 @@ export function normalizeAasJson(
   // Extract contacts
   const contacts = extractContacts(parsed);
 
+  // Extract enhanced features
+  const submodels = extractSubmodels(parsed);
+  const pcf = extractPcfData(parsed);
+  const lifecyclePhase = findLifecyclePhase(parsed);
+  const spareParts = extractSpareParts(parsed);
+
   // Validate that we got something useful
   if (!asset.displayName && !asset.assetId && !asset.serialNumber) {
     errors.push('Could not extract asset identification from JSON');
@@ -49,6 +58,11 @@ export function normalizeAasJson(
     asset,
     docs,
     contacts,
+    // Enhanced features
+    submodels: submodels.length > 0 ? submodels : undefined,
+    pcf,
+    lifecyclePhase,
+    spareParts: spareParts.length > 0 ? spareParts : undefined,
   };
 }
 
@@ -74,6 +88,10 @@ function extractAsset(parsed: unknown, customMappings?: FieldMapping): AasAsset 
 
   // Try to find year of construction
   asset.yearOfConstruction = findYearOfConstruction(parsed);
+
+  // Try to find commissioning and service dates
+  asset.commissioningDate = findCommissioningDate(parsed);
+  asset.lastServiceDate = findLastServiceDate(parsed);
 
   // Use productDesignation as displayName fallback
   if (!asset.displayName && asset.productDesignation) {

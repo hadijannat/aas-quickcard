@@ -1,4 +1,4 @@
-import type { DocKind, ContactType, FieldMapping } from '../shared/types';
+import type { DocKind, ContactType, FieldMapping, LifecyclePhase } from '../shared/types';
 import { DEFAULT_FIELD_MAPPINGS } from '../shared/storage';
 
 /**
@@ -291,4 +291,169 @@ function formatLabel(str: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+/**
+ * Find lifecycle phase from AAS data
+ * Searches for LifeCyclePhase, assetKind, status, and related properties
+ */
+export function findLifecyclePhase(obj: unknown): LifecyclePhase {
+  if (!obj || typeof obj !== 'object') return 'unknown';
+
+  const phaseMap: Record<string, LifecyclePhase> = {
+    // Direct phase names
+    'development': 'development',
+    'design': 'development',
+    'engineering': 'development',
+    'prototype': 'development',
+    'production': 'production',
+    'manufacturing': 'production',
+    'assembly': 'production',
+    'operation': 'operation',
+    'operational': 'operation',
+    'in service': 'operation',
+    'active': 'operation',
+    'running': 'operation',
+    'maintenance': 'maintenance',
+    'repair': 'maintenance',
+    'service': 'maintenance',
+    'overhaul': 'maintenance',
+    'disposal': 'disposal',
+    'decommissioned': 'disposal',
+    'retired': 'disposal',
+    'end of life': 'disposal',
+    'eol': 'disposal',
+    // Asset kind mapping
+    'type': 'development',    // Type = template/design
+    'instance': 'operation',  // Instance = deployed asset
+  };
+
+  const searchPhase = (item: unknown, visited = new WeakSet<object>()): LifecyclePhase | undefined => {
+    if (!item || typeof item !== 'object') return undefined;
+    if (visited.has(item as object)) return undefined;
+    visited.add(item as object);
+
+    const record = item as Record<string, unknown>;
+    const idShort = (record.idShort as string)?.toLowerCase();
+    const value = record.value as string | undefined;
+
+    // Check for lifecycle-related properties
+    if (idShort && value && typeof value === 'string') {
+      const normalizedIdShort = idShort.toLowerCase();
+      const normalizedValue = value.toLowerCase();
+
+      // Direct lifecycle phase property
+      if (
+        normalizedIdShort.includes('lifecycle') ||
+        normalizedIdShort.includes('phase') ||
+        normalizedIdShort.includes('status') ||
+        normalizedIdShort === 'assetkind'
+      ) {
+        const mapped = phaseMap[normalizedValue];
+        if (mapped) return mapped;
+      }
+    }
+
+    // Check assetKind at object level
+    if (typeof record.assetKind === 'string') {
+      const kind = record.assetKind.toLowerCase();
+      const mapped = phaseMap[kind];
+      if (mapped) return mapped;
+    }
+
+    // Recurse into nested objects
+    for (const key of Object.keys(record)) {
+      const val = record[key];
+      if (Array.isArray(val)) {
+        for (const child of val) {
+          const found = searchPhase(child, visited);
+          if (found) return found;
+        }
+      } else if (typeof val === 'object' && val !== null) {
+        const found = searchPhase(val, visited);
+        if (found) return found;
+      }
+    }
+
+    return undefined;
+  };
+
+  return searchPhase(obj) ?? 'unknown';
+}
+
+/**
+ * Find commissioning date from AAS data
+ */
+export function findCommissioningDate(obj: unknown): string | undefined {
+  const datePatterns = [
+    'commissioningdate',
+    'commissioning',
+    'installationdate',
+    'installation',
+    'startupdate',
+    'startup',
+    'dateofcommissioning',
+  ];
+
+  return findDateProperty(obj, datePatterns);
+}
+
+/**
+ * Find last service date from AAS data
+ */
+export function findLastServiceDate(obj: unknown): string | undefined {
+  const datePatterns = [
+    'lastservicedate',
+    'lastservice',
+    'lastmaintenance',
+    'lastmaintenancedate',
+    'servicedate',
+    'maintenancedate',
+  ];
+
+  return findDateProperty(obj, datePatterns);
+}
+
+/**
+ * Generic date property finder
+ */
+function findDateProperty(obj: unknown, patterns: string[]): string | undefined {
+  if (!obj || typeof obj !== 'object') return undefined;
+
+  const searchDate = (item: unknown, visited = new WeakSet<object>()): string | undefined => {
+    if (!item || typeof item !== 'object') return undefined;
+    if (visited.has(item as object)) return undefined;
+    visited.add(item as object);
+
+    const record = item as Record<string, unknown>;
+    const idShort = record.idShort as string | undefined;
+    const value = record.value as string | undefined;
+
+    if (idShort && value && typeof value === 'string') {
+      const normalizedIdShort = idShort.toLowerCase().replace(/[_\-\s]/g, '');
+      for (const pattern of patterns) {
+        if (normalizedIdShort.includes(pattern.replace(/[_\-\s]/g, ''))) {
+          return value;
+        }
+      }
+    }
+
+    // Recurse
+    for (const key of Object.keys(record)) {
+      const val = record[key];
+      if (Array.isArray(val)) {
+        for (const child of val) {
+          const found = searchDate(child, visited);
+          if (found) return found;
+        }
+      } else if (typeof val === 'object' && val !== null) {
+        const found = searchDate(val, visited);
+        if (found) return found;
+      }
+    }
+
+    return undefined;
+  };
+
+  return searchDate(obj);
 }

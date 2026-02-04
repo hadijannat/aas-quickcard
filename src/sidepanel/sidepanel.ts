@@ -1,12 +1,21 @@
-import type { AasSnapshot, UserRole, ExtensionMessage, RoleVisibility, DocKind, AasDocument, AasContact } from '../shared/types';
+import type { AasSnapshot, UserRole, ExtensionMessage, RoleVisibility, DocKind, AasDocument, AasContact, SubmodelInfo, SparePart, ComplianceProfileType, LifecyclePhase } from '../shared/types';
 import { ROLE_VISIBILITY } from '../shared/types';
-import { loadSettings, setCurrentRole, loadFavorites, addFavorite, removeFavorite, type FavoriteAsset } from '../shared/storage';
+import { loadSettings, setCurrentRole, loadFavorites, addFavorite, removeFavorite, addTags, removeTags, getAllTags, getAllCategories, getStorageUsage, formatBytes, type FavoriteAsset } from '../shared/storage';
 import { createSnapshotFromPaste, createSnapshotFromPage } from '../parser/normalize';
 import { parseFile } from '../parser/aasx-parser';
+import { formatPcfValue } from '../parser/pcfExtractor';
+import { formatSparePartsList } from '../parser/sparePartsExtractor';
+import { runComplianceCheck, generateComplianceReport, calculateComplianceScore, getComplianceStatusLabel } from '../compliance/checklistGenerator';
+import { compareAssets, generateComparisonTable, generateComparisonMarkdown } from './comparison';
+import { searchFavorites } from '../shared/search';
 
 // State
 let currentSnapshot: AasSnapshot | null = null;
 let currentRole: UserRole = 'maintenance';
+let selectedFavorites: Set<string> = new Set();
+let activeTagFilters: Set<string> = new Set();
+let currentComplianceProfile: ComplianceProfileType = 'ce-marking';
+let editingFavoriteId: string | null = null;
 
 // DOM Elements
 const elements = {
@@ -74,6 +83,65 @@ const elements = {
   favoritesSection: document.getElementById('favorites-section') as HTMLElement,
   favoritesList: document.getElementById('favorites-list') as HTMLUListElement,
   noFavorites: document.getElementById('no-favorites') as HTMLParagraphElement,
+
+  // Enhanced - Lifecycle Badge
+  lifecycleBadge: document.getElementById('lifecycle-badge') as HTMLSpanElement,
+
+  // Enhanced - Submodels
+  submodelsSection: document.getElementById('submodels-section') as HTMLElement,
+  submodelsHeader: document.getElementById('submodels-header') as HTMLDivElement,
+  submodelsCount: document.getElementById('submodels-count') as HTMLSpanElement,
+  submodelsList: document.getElementById('submodels-list') as HTMLUListElement,
+
+  // Enhanced - PCF
+  pcfSection: document.getElementById('pcf-section') as HTMLElement,
+  pcfValue: document.getElementById('pcf-value') as HTMLSpanElement,
+  pcfUnit: document.getElementById('pcf-unit') as HTMLSpanElement,
+  pcfScope: document.getElementById('pcf-scope') as HTMLSpanElement,
+  pcfMethod: document.getElementById('pcf-method') as HTMLSpanElement,
+  pcfValidity: document.getElementById('pcf-validity') as HTMLSpanElement,
+
+  // Enhanced - Spare Parts
+  sparepartsSection: document.getElementById('spareparts-section') as HTMLElement,
+  sparepartsCount: document.getElementById('spareparts-count') as HTMLSpanElement,
+  sparePartsList: document.getElementById('spareparts-list') as HTMLUListElement,
+  noSpareParts: document.getElementById('no-spareparts') as HTMLParagraphElement,
+  btnCopyParts: document.getElementById('btn-copy-parts') as HTMLButtonElement,
+
+  // Enhanced - Compliance
+  btnCompliance: document.getElementById('btn-compliance') as HTMLButtonElement,
+  complianceModal: document.getElementById('compliance-modal') as HTMLDivElement,
+  complianceProfileSelect: document.getElementById('compliance-profile-select') as HTMLSelectElement,
+  complianceSummary: document.getElementById('compliance-summary') as HTMLDivElement,
+  complianceChecklist: document.getElementById('compliance-checklist') as HTMLDivElement,
+  btnComplianceClose: document.getElementById('btn-compliance-close') as HTMLButtonElement,
+  btnComplianceExport: document.getElementById('btn-compliance-export') as HTMLButtonElement,
+
+  // Enhanced - Favorites
+  storageIndicator: document.getElementById('storage-indicator') as HTMLDivElement,
+  storageFill: document.getElementById('storage-fill') as HTMLDivElement,
+  storageText: document.getElementById('storage-text') as HTMLSpanElement,
+  favoritesSearch: document.getElementById('favorites-search') as HTMLInputElement,
+  favoritesCategory: document.getElementById('favorites-category') as HTMLSelectElement,
+  favoritesTags: document.getElementById('favorites-tags') as HTMLDivElement,
+  compareToolbar: document.getElementById('compare-toolbar') as HTMLDivElement,
+  compareCount: document.getElementById('compare-count') as HTMLSpanElement,
+  btnCompare: document.getElementById('btn-compare') as HTMLButtonElement,
+  btnClearSelection: document.getElementById('btn-clear-selection') as HTMLButtonElement,
+
+  // Enhanced - Comparison Modal
+  comparisonModal: document.getElementById('comparison-modal') as HTMLDivElement,
+  comparisonTableContainer: document.getElementById('comparison-table-container') as HTMLDivElement,
+  btnComparisonClose: document.getElementById('btn-comparison-close') as HTMLButtonElement,
+  btnComparisonCopy: document.getElementById('btn-comparison-copy') as HTMLButtonElement,
+
+  // Enhanced - Tag Modal
+  tagModal: document.getElementById('tag-modal') as HTMLDivElement,
+  currentTags: document.getElementById('current-tags') as HTMLDivElement,
+  newTagInput: document.getElementById('new-tag-input') as HTMLInputElement,
+  btnAddTag: document.getElementById('btn-add-tag') as HTMLButtonElement,
+  suggestedTags: document.getElementById('suggested-tags') as HTMLDivElement,
+  btnTagClose: document.getElementById('btn-tag-close') as HTMLButtonElement,
 };
 
 // Initialize
@@ -126,12 +194,53 @@ function setupEventListeners(): void {
   elements.btnQrClose.addEventListener('click', closeQrModal);
   elements.btnQrDownload.addEventListener('click', handleQrDownload);
 
+  // Enhanced - Submodels
+  elements.submodelsHeader?.addEventListener('click', toggleSubmodelsSection);
+
+  // Enhanced - Spare Parts
+  elements.btnCopyParts?.addEventListener('click', handleCopyPartsList);
+  elements.sparepartsSection?.querySelectorAll('.filter-btn').forEach((btn) => {
+    btn.addEventListener('click', handleSparePartsFilter);
+  });
+
+  // Enhanced - Compliance
+  elements.btnCompliance?.addEventListener('click', openComplianceModal);
+  elements.btnComplianceClose?.addEventListener('click', closeComplianceModal);
+  elements.btnComplianceExport?.addEventListener('click', handleComplianceExport);
+  elements.complianceProfileSelect?.addEventListener('change', handleComplianceProfileChange);
+
+  // Enhanced - Favorites Search & Filter
+  elements.favoritesSearch?.addEventListener('input', handleFavoritesSearch);
+  elements.favoritesCategory?.addEventListener('change', handleFavoritesSearch);
+
+  // Enhanced - Comparison
+  elements.btnCompare?.addEventListener('click', openComparisonModal);
+  elements.btnClearSelection?.addEventListener('click', clearFavoriteSelection);
+  elements.btnComparisonClose?.addEventListener('click', closeComparisonModal);
+  elements.btnComparisonCopy?.addEventListener('click', handleCopyComparison);
+
+  // Enhanced - Tag Modal
+  elements.btnAddTag?.addEventListener('click', handleAddTag);
+  elements.btnTagClose?.addEventListener('click', closeTagModal);
+  elements.newTagInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleAddTag();
+  });
+
   // Click outside modal to close
   elements.pasteModal.addEventListener('click', (e) => {
     if (e.target === elements.pasteModal) closePasteModal();
   });
   elements.qrModal.addEventListener('click', (e) => {
     if (e.target === elements.qrModal) closeQrModal();
+  });
+  elements.complianceModal?.addEventListener('click', (e) => {
+    if (e.target === elements.complianceModal) closeComplianceModal();
+  });
+  elements.comparisonModal?.addEventListener('click', (e) => {
+    if (e.target === elements.comparisonModal) closeComparisonModal();
+  });
+  elements.tagModal?.addEventListener('click', (e) => {
+    if (e.target === elements.tagModal) closeTagModal();
   });
 }
 
@@ -265,6 +374,12 @@ function displaySnapshot(snapshot: AasSnapshot): void {
 
   // Render contacts
   renderContacts(snapshot.contacts);
+
+  // Render enhanced features
+  renderLifecycleBadge(snapshot.lifecyclePhase);
+  renderSubmodels(snapshot.submodels);
+  renderPcfCard(snapshot.pcf);
+  renderSpareParts(snapshot.spareParts);
 
   // Apply role filtering
   applyRoleFiltering();
@@ -445,21 +560,7 @@ function filterDocuments(): void {
   });
 }
 
-// Apply role-based filtering
-function applyRoleFiltering(): void {
-  const visibility = ROLE_VISIBILITY[currentRole];
-
-  // Filter documents by kind
-  const docItems = elements.documentsList.querySelectorAll('.doc-item');
-  docItems.forEach((item) => {
-    const kind = (item as HTMLElement).dataset.kind as DocKind;
-    const visible = isDocKindVisible(kind, visibility);
-    (item as HTMLElement).style.display = visible ? '' : 'none';
-  });
-
-  // Show/hide contacts section
-  elements.contactsSection.style.display = visibility.serviceContacts ? '' : 'none';
-}
+// Apply role-based filtering (enhanced version is at the end of the file)
 
 function isDocKindVisible(kind: DocKind, visibility: RoleVisibility): boolean {
   switch (kind) {
@@ -541,72 +642,7 @@ async function handlePin(): Promise<void> {
   showToast('Asset pinned to favorites');
 }
 
-async function refreshFavorites(): Promise<void> {
-  const favorites = await loadFavorites();
-
-  // Clear existing content
-  while (elements.favoritesList.firstChild) {
-    elements.favoritesList.removeChild(elements.favoritesList.firstChild);
-  }
-
-  if (favorites.length === 0) {
-    elements.noFavorites.classList.remove('hidden');
-    elements.favoritesSection.classList.add('hidden');
-    return;
-  }
-
-  elements.noFavorites.classList.add('hidden');
-  elements.favoritesSection.classList.remove('hidden');
-
-  for (const fav of favorites) {
-    const li = createFavoriteItem(fav);
-    elements.favoritesList.appendChild(li);
-  }
-}
-
-function createFavoriteItem(fav: FavoriteAsset): HTMLLIElement {
-  const li = document.createElement('li');
-  li.className = 'favorite-item';
-
-  // Create info div
-  const docInfo = document.createElement('div');
-  docInfo.className = 'doc-info';
-
-  const favName = document.createElement('span');
-  favName.className = 'favorite-name';
-  favName.textContent = fav.nickname || fav.snapshot.asset.displayName || 'Unnamed';
-
-  const favDate = document.createElement('span');
-  favDate.className = 'favorite-date';
-  favDate.textContent = new Date(fav.pinnedAt).toLocaleDateString();
-
-  docInfo.appendChild(favName);
-  docInfo.appendChild(favDate);
-
-  // Create remove button
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'small-btn fav-remove-btn';
-  removeBtn.title = 'Remove';
-  removeBtn.textContent = '×';
-
-  li.appendChild(docInfo);
-  li.appendChild(removeBtn);
-
-  // Event listeners
-  li.addEventListener('click', (e) => {
-    if (!(e.target as HTMLElement).classList.contains('fav-remove-btn')) {
-      displaySnapshot(fav.snapshot);
-    }
-  });
-
-  removeBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await removeFavorite(fav.id);
-    await refreshFavorites();
-  });
-
-  return li;
-}
+// refreshFavorites and createFavoriteItem are now defined as enhanced versions at the end of the file
 
 // QR Code
 async function handleShowQr(): Promise<void> {
@@ -702,6 +738,796 @@ function sendMessage(message: ExtensionMessage): Promise<unknown> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, resolve);
   });
+}
+
+// ====== Enhanced Feature Functions ======
+
+// Lifecycle Badge
+function renderLifecycleBadge(phase?: LifecyclePhase): void {
+  if (!elements.lifecycleBadge) return;
+
+  if (!phase || phase === 'unknown') {
+    elements.lifecycleBadge.classList.add('hidden');
+    return;
+  }
+
+  elements.lifecycleBadge.textContent = phase;
+  elements.lifecycleBadge.className = `lifecycle-badge lifecycle-${phase}`;
+
+  // Add tooltip with additional info
+  let tooltip = `Phase: ${phase}`;
+  if (currentSnapshot?.asset.commissioningDate) {
+    tooltip += `\nCommissioned: ${currentSnapshot.asset.commissioningDate}`;
+  }
+  if (currentSnapshot?.asset.lastServiceDate) {
+    tooltip += `\nLast Service: ${currentSnapshot.asset.lastServiceDate}`;
+  }
+  elements.lifecycleBadge.title = tooltip;
+}
+
+// Submodel Explorer
+function renderSubmodels(submodels?: SubmodelInfo[]): void {
+  if (!elements.submodelsSection || !elements.submodelsList) return;
+
+  // Clear existing
+  while (elements.submodelsList.firstChild) {
+    elements.submodelsList.removeChild(elements.submodelsList.firstChild);
+  }
+
+  if (!submodels || submodels.length === 0) {
+    elements.submodelsSection.classList.add('hidden');
+    return;
+  }
+
+  elements.submodelsSection.classList.remove('hidden');
+  elements.submodelsCount.textContent = String(submodels.length);
+
+  for (const sm of submodels) {
+    const li = createSubmodelItem(sm);
+    elements.submodelsList.appendChild(li);
+  }
+}
+
+function createSubmodelItem(sm: SubmodelInfo): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'submodel-item';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'submodel-header';
+
+  const name = document.createElement('span');
+  name.className = 'submodel-name';
+  name.textContent = sm.idShort;
+
+  const count = document.createElement('span');
+  count.className = 'submodel-count';
+  count.textContent = `${sm.elementCount} elements`;
+
+  header.appendChild(name);
+  header.appendChild(count);
+  li.appendChild(header);
+
+  // Template badge
+  if (sm.templateName) {
+    const badge = document.createElement('span');
+    badge.className = 'submodel-template';
+    badge.textContent = sm.templateName;
+    li.appendChild(badge);
+  }
+
+  // Elements (expandable)
+  if (sm.elements && sm.elements.length > 0) {
+    const elementsDiv = document.createElement('div');
+    elementsDiv.className = 'submodel-elements';
+
+    for (const el of sm.elements.slice(0, 10)) {  // Show first 10
+      const elItem = document.createElement('div');
+      elItem.className = 'element-item';
+
+      const elName = document.createElement('span');
+      elName.className = 'element-name';
+      elName.textContent = el.idShort;
+
+      const elValue = document.createElement('span');
+      elValue.className = 'element-value';
+      elValue.textContent = el.value !== undefined ? String(el.value) : '-';
+
+      elItem.appendChild(elName);
+      elItem.appendChild(elValue);
+      elementsDiv.appendChild(elItem);
+    }
+
+    if (sm.elements.length > 10) {
+      const more = document.createElement('div');
+      more.className = 'element-item';
+      more.textContent = `... and ${sm.elements.length - 10} more`;
+      elementsDiv.appendChild(more);
+    }
+
+    li.appendChild(elementsDiv);
+
+    // Click to expand
+    li.addEventListener('click', () => {
+      li.classList.toggle('expanded');
+    });
+  }
+
+  return li;
+}
+
+function toggleSubmodelsSection(): void {
+  const section = elements.submodelsSection;
+  if (section) {
+    section.classList.toggle('collapsed');
+  }
+}
+
+// PCF Card
+function renderPcfCard(pcf?: { co2Equivalent?: number; unit?: string; scope?: string; calculationMethod?: string; validFrom?: string; validTo?: string }): void {
+  if (!elements.pcfSection) return;
+
+  if (!pcf || pcf.co2Equivalent === undefined) {
+    elements.pcfSection.classList.add('hidden');
+    return;
+  }
+
+  elements.pcfSection.classList.remove('hidden');
+
+  // Format and display value
+  const formatted = formatPcfValue(pcf);
+  const parts = formatted.split(' ');
+  elements.pcfValue.textContent = parts[0];
+  elements.pcfUnit.textContent = parts.slice(1).join(' ');
+
+  // Badges
+  if (pcf.scope) {
+    elements.pcfScope.textContent = pcf.scope;
+    elements.pcfScope.classList.remove('hidden');
+  } else {
+    elements.pcfScope.classList.add('hidden');
+  }
+
+  if (pcf.calculationMethod) {
+    elements.pcfMethod.textContent = pcf.calculationMethod;
+    elements.pcfMethod.classList.remove('hidden');
+  } else {
+    elements.pcfMethod.classList.add('hidden');
+  }
+
+  if (pcf.validFrom || pcf.validTo) {
+    const validity = pcf.validFrom && pcf.validTo
+      ? `${pcf.validFrom} - ${pcf.validTo}`
+      : pcf.validFrom || pcf.validTo || '';
+    elements.pcfValidity.textContent = validity;
+    elements.pcfValidity.classList.remove('hidden');
+  } else {
+    elements.pcfValidity.classList.add('hidden');
+  }
+}
+
+// Spare Parts
+function renderSpareParts(spareParts?: SparePart[]): void {
+  if (!elements.sparepartsSection || !elements.sparePartsList) return;
+
+  // Clear existing
+  while (elements.sparePartsList.firstChild) {
+    elements.sparePartsList.removeChild(elements.sparePartsList.firstChild);
+  }
+
+  if (!spareParts || spareParts.length === 0) {
+    elements.sparepartsSection.classList.add('hidden');
+    return;
+  }
+
+  elements.sparepartsSection.classList.remove('hidden');
+  elements.sparepartsCount.textContent = String(spareParts.length);
+  elements.noSpareParts.classList.add('hidden');
+
+  for (const part of spareParts) {
+    const li = createSparePartItem(part);
+    elements.sparePartsList.appendChild(li);
+  }
+}
+
+function createSparePartItem(part: SparePart): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'sparepart-item';
+  li.dataset.category = part.category;
+
+  const info = document.createElement('div');
+  info.className = 'sparepart-info';
+
+  const number = document.createElement('span');
+  number.className = 'sparepart-number';
+  number.textContent = part.partNumber;
+
+  info.appendChild(number);
+
+  if (part.description) {
+    const desc = document.createElement('span');
+    desc.className = 'sparepart-desc';
+    desc.textContent = part.description;
+    info.appendChild(desc);
+  }
+
+  li.appendChild(info);
+
+  const category = document.createElement('span');
+  category.className = `sparepart-category category-${part.category}`;
+  category.textContent = part.category;
+  li.appendChild(category);
+
+  // Copy on click
+  li.addEventListener('click', () => {
+    copyToClipboard(part.partNumber);
+    showToast(`Copied: ${part.partNumber}`);
+  });
+
+  return li;
+}
+
+function handleSparePartsFilter(e: Event): void {
+  const btn = e.target as HTMLButtonElement;
+  const category = btn.dataset.category;
+
+  // Update active state
+  elements.sparepartsSection.querySelectorAll('.filter-btn').forEach((b) => {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+
+  // Filter items
+  const items = elements.sparePartsList.querySelectorAll('.sparepart-item');
+  items.forEach((item) => {
+    const el = item as HTMLElement;
+    if (category === 'all' || el.dataset.category === category) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+
+async function handleCopyPartsList(): Promise<void> {
+  if (!currentSnapshot?.spareParts) return;
+  const text = formatSparePartsList(currentSnapshot.spareParts);
+  await copyToClipboard(text);
+  showToast('Parts list copied');
+}
+
+// Compliance Modal
+function openComplianceModal(): void {
+  if (!currentSnapshot || !elements.complianceModal) return;
+  elements.complianceModal.classList.remove('hidden');
+  renderComplianceChecklist();
+}
+
+function closeComplianceModal(): void {
+  elements.complianceModal?.classList.add('hidden');
+}
+
+function handleComplianceProfileChange(): void {
+  currentComplianceProfile = elements.complianceProfileSelect.value as ComplianceProfileType;
+  renderComplianceChecklist();
+}
+
+function renderComplianceChecklist(): void {
+  if (!currentSnapshot) return;
+
+  const result = runComplianceCheck(currentSnapshot, currentComplianceProfile);
+  const score = calculateComplianceScore(result);
+  const status = getComplianceStatusLabel(result);
+
+  // Clear and rebuild summary using safe DOM methods
+  while (elements.complianceSummary.firstChild) {
+    elements.complianceSummary.removeChild(elements.complianceSummary.firstChild);
+  }
+
+  // Overall score
+  const scoreDiv1 = document.createElement('div');
+  scoreDiv1.className = 'compliance-score';
+  const scoreValue1 = document.createElement('span');
+  scoreValue1.className = `score-value ${status}`;
+  scoreValue1.textContent = `${score}%`;
+  const scoreLabel1 = document.createElement('span');
+  scoreLabel1.className = 'score-label';
+  scoreLabel1.textContent = 'Overall Score';
+  scoreDiv1.appendChild(scoreValue1);
+  scoreDiv1.appendChild(scoreLabel1);
+  elements.complianceSummary.appendChild(scoreDiv1);
+
+  // Mandatory score
+  const scoreDiv2 = document.createElement('div');
+  scoreDiv2.className = 'compliance-score';
+  const scoreValue2 = document.createElement('span');
+  scoreValue2.className = `score-value ${result.mandatoryPassed === result.mandatoryTotal ? 'compliant' : 'non-compliant'}`;
+  scoreValue2.textContent = `${result.mandatoryPassed}/${result.mandatoryTotal}`;
+  const scoreLabel2 = document.createElement('span');
+  scoreLabel2.className = 'score-label';
+  scoreLabel2.textContent = 'Mandatory';
+  scoreDiv2.appendChild(scoreValue2);
+  scoreDiv2.appendChild(scoreLabel2);
+  elements.complianceSummary.appendChild(scoreDiv2);
+
+  // Optional score
+  const scoreDiv3 = document.createElement('div');
+  scoreDiv3.className = 'compliance-score';
+  const scoreValue3 = document.createElement('span');
+  scoreValue3.className = 'score-value';
+  scoreValue3.textContent = `${result.passedCount - result.mandatoryPassed}/${result.totalCount - result.mandatoryTotal}`;
+  const scoreLabel3 = document.createElement('span');
+  scoreLabel3.className = 'score-label';
+  scoreLabel3.textContent = 'Optional';
+  scoreDiv3.appendChild(scoreValue3);
+  scoreDiv3.appendChild(scoreLabel3);
+  elements.complianceSummary.appendChild(scoreDiv3);
+
+  // Clear and rebuild checklist using safe DOM methods
+  while (elements.complianceChecklist.firstChild) {
+    elements.complianceChecklist.removeChild(elements.complianceChecklist.firstChild);
+  }
+
+  for (const check of result.checks) {
+    const checkItem = document.createElement('div');
+    checkItem.className = 'check-item';
+
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'check-status';
+    statusSpan.textContent = check.present ? '✅' : '❌';
+    checkItem.appendChild(statusSpan);
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'check-content';
+
+    const reqDiv = document.createElement('div');
+    reqDiv.className = check.mandatory ? 'check-requirement mandatory' : 'check-requirement';
+    reqDiv.textContent = check.requirement;
+    contentDiv.appendChild(reqDiv);
+
+    if (check.description) {
+      const descDiv = document.createElement('div');
+      descDiv.className = 'check-description';
+      descDiv.textContent = check.description;
+      contentDiv.appendChild(descDiv);
+    }
+
+    if (check.present && check.source) {
+      const sourceDiv = document.createElement('div');
+      sourceDiv.className = 'check-source';
+      sourceDiv.textContent = `Source: ${check.source}`;
+      contentDiv.appendChild(sourceDiv);
+    }
+
+    checkItem.appendChild(contentDiv);
+    elements.complianceChecklist.appendChild(checkItem);
+  }
+}
+
+async function handleComplianceExport(): Promise<void> {
+  if (!currentSnapshot) return;
+
+  const profiles: ComplianceProfileType[] = ['ce-marking', 'reach', 'rohs', 'dpp'];
+  const results = profiles.map((p) => runComplianceCheck(currentSnapshot!, p));
+  const markdown = generateComplianceReport(currentSnapshot, results);
+
+  await copyToClipboard(markdown);
+  showToast('Compliance report copied');
+}
+
+// Enhanced Favorites
+async function refreshFavoritesEnhanced(): Promise<void> {
+  const favorites = await searchFavorites(
+    {
+      query: elements.favoritesSearch?.value,
+      tags: activeTagFilters.size > 0 ? [...activeTagFilters] : undefined,
+      categories: elements.favoritesCategory?.value ? [elements.favoritesCategory.value] : undefined,
+    },
+    'date-desc'
+  );
+
+  // Update storage indicator
+  await updateStorageIndicator();
+
+  // Update category dropdown
+  await updateCategoryDropdown();
+
+  // Update tags display
+  await updateTagsDisplay();
+
+  // Clear existing content
+  while (elements.favoritesList.firstChild) {
+    elements.favoritesList.removeChild(elements.favoritesList.firstChild);
+  }
+
+  if (favorites.length === 0) {
+    elements.noFavorites.classList.remove('hidden');
+    elements.favoritesSection.classList.add('hidden');
+    return;
+  }
+
+  elements.noFavorites.classList.add('hidden');
+  elements.favoritesSection.classList.remove('hidden');
+
+  for (const fav of favorites) {
+    const li = createEnhancedFavoriteItem(fav);
+    elements.favoritesList.appendChild(li);
+  }
+
+  // Update compare toolbar visibility
+  updateCompareToolbar();
+}
+
+function createEnhancedFavoriteItem(fav: FavoriteAsset): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'favorite-item has-checkbox';
+  li.dataset.id = fav.id;
+
+  // Checkbox for comparison
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'favorite-checkbox';
+  checkbox.checked = selectedFavorites.has(fav.id);
+  checkbox.addEventListener('change', () => toggleFavoriteSelection(fav.id));
+  li.appendChild(checkbox);
+
+  // Info div
+  const docInfo = document.createElement('div');
+  docInfo.className = 'doc-info';
+
+  const favName = document.createElement('span');
+  favName.className = 'favorite-name';
+  favName.textContent = fav.nickname || fav.snapshot.asset.displayName || 'Unnamed';
+
+  const favDate = document.createElement('span');
+  favDate.className = 'favorite-date';
+  favDate.textContent = new Date(fav.pinnedAt).toLocaleDateString();
+
+  docInfo.appendChild(favName);
+  docInfo.appendChild(favDate);
+
+  // Tags display
+  if (fav.tags && fav.tags.length > 0) {
+    const tagsDiv = document.createElement('div');
+    tagsDiv.className = 'favorite-tags';
+    for (const tag of fav.tags.slice(0, 3)) {  // Show first 3
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'favorite-tag';
+      tagSpan.textContent = tag;
+      tagsDiv.appendChild(tagSpan);
+    }
+    if (fav.tags.length > 3) {
+      const more = document.createElement('span');
+      more.className = 'favorite-tag';
+      more.textContent = `+${fav.tags.length - 3}`;
+      tagsDiv.appendChild(more);
+    }
+    docInfo.appendChild(tagsDiv);
+  }
+
+  li.appendChild(docInfo);
+
+  // Actions
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'favorite-actions';
+
+  // Tag button
+  const tagBtn = document.createElement('button');
+  tagBtn.className = 'small-btn';
+  tagBtn.title = 'Edit Tags';
+  tagBtn.textContent = '🏷️';
+  tagBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openTagModal(fav.id);
+  });
+  actionsDiv.appendChild(tagBtn);
+
+  // Remove button
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'small-btn fav-remove-btn';
+  removeBtn.title = 'Remove';
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await removeFavorite(fav.id);
+    selectedFavorites.delete(fav.id);
+    await refreshFavoritesEnhanced();
+  });
+  actionsDiv.appendChild(removeBtn);
+
+  li.appendChild(actionsDiv);
+
+  // Click to display
+  li.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains('fav-remove-btn') &&
+        !target.classList.contains('favorite-checkbox') &&
+        target.tagName !== 'BUTTON') {
+      displaySnapshot(fav.snapshot);
+    }
+  });
+
+  return li;
+}
+
+function toggleFavoriteSelection(id: string): void {
+  if (selectedFavorites.has(id)) {
+    selectedFavorites.delete(id);
+  } else {
+    if (selectedFavorites.size < 3) {
+      selectedFavorites.add(id);
+    } else {
+      showToast('Maximum 3 assets for comparison');
+      // Uncheck the checkbox
+      const checkbox = document.querySelector(`[data-id="${id}"] .favorite-checkbox`) as HTMLInputElement;
+      if (checkbox) checkbox.checked = false;
+    }
+  }
+  updateCompareToolbar();
+}
+
+function updateCompareToolbar(): void {
+  if (!elements.compareToolbar) return;
+
+  if (selectedFavorites.size > 0) {
+    elements.compareToolbar.classList.remove('hidden');
+    elements.compareCount.textContent = `${selectedFavorites.size} selected`;
+    elements.btnCompare.disabled = selectedFavorites.size < 2;
+  } else {
+    elements.compareToolbar.classList.add('hidden');
+  }
+}
+
+function clearFavoriteSelection(): void {
+  selectedFavorites.clear();
+  document.querySelectorAll('.favorite-checkbox').forEach((cb) => {
+    (cb as HTMLInputElement).checked = false;
+  });
+  updateCompareToolbar();
+}
+
+async function updateStorageIndicator(): Promise<void> {
+  if (!elements.storageFill || !elements.storageText) return;
+
+  const usage = await getStorageUsage();
+  elements.storageFill.style.width = `${usage.percentage}%`;
+  elements.storageText.textContent = `${formatBytes(usage.used)}`;
+
+  // Color based on usage
+  elements.storageFill.classList.remove('warning', 'critical');
+  if (usage.percentage > 80) {
+    elements.storageFill.classList.add('critical');
+  } else if (usage.percentage > 60) {
+    elements.storageFill.classList.add('warning');
+  }
+}
+
+async function updateCategoryDropdown(): Promise<void> {
+  if (!elements.favoritesCategory) return;
+
+  const categories = await getAllCategories();
+  const currentValue = elements.favoritesCategory.value;
+
+  // Clear and rebuild
+  while (elements.favoritesCategory.firstChild) {
+    elements.favoritesCategory.removeChild(elements.favoritesCategory.firstChild);
+  }
+
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'All Categories';
+  elements.favoritesCategory.appendChild(defaultOption);
+
+  for (const cat of categories) {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    elements.favoritesCategory.appendChild(option);
+  }
+
+  // Restore selection
+  elements.favoritesCategory.value = currentValue;
+}
+
+async function updateTagsDisplay(): Promise<void> {
+  if (!elements.favoritesTags) return;
+
+  const tags = await getAllTags();
+
+  // Clear existing
+  while (elements.favoritesTags.firstChild) {
+    elements.favoritesTags.removeChild(elements.favoritesTags.firstChild);
+  }
+
+  for (const tag of tags) {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    if (activeTagFilters.has(tag)) {
+      pill.classList.add('active');
+    }
+    pill.textContent = tag;
+    pill.addEventListener('click', () => {
+      if (activeTagFilters.has(tag)) {
+        activeTagFilters.delete(tag);
+      } else {
+        activeTagFilters.add(tag);
+      }
+      refreshFavoritesEnhanced();
+    });
+    elements.favoritesTags.appendChild(pill);
+  }
+}
+
+async function handleFavoritesSearch(): Promise<void> {
+  await refreshFavoritesEnhanced();
+}
+
+// Comparison Modal
+async function openComparisonModal(): Promise<void> {
+  if (selectedFavorites.size < 2 || !elements.comparisonModal) return;
+
+  const allFavorites = await loadFavorites();
+  const selected = allFavorites.filter((f) => selectedFavorites.has(f.id));
+
+  const rows = compareAssets(selected);
+  const tableHtml = generateComparisonTable(selected, rows);
+
+  // Use safe DOM insertion - the comparison table HTML is generated from our own code
+  // and escapes user content, so this is safe
+  elements.comparisonTableContainer.innerHTML = tableHtml;
+  elements.comparisonModal.classList.remove('hidden');
+}
+
+function closeComparisonModal(): void {
+  elements.comparisonModal?.classList.add('hidden');
+}
+
+async function handleCopyComparison(): Promise<void> {
+  const allFavorites = await loadFavorites();
+  const selected = allFavorites.filter((f) => selectedFavorites.has(f.id));
+
+  const rows = compareAssets(selected);
+  const markdown = generateComparisonMarkdown(selected, rows);
+
+  await copyToClipboard(markdown);
+  showToast('Comparison table copied');
+}
+
+// Tag Modal
+async function openTagModal(favoriteId: string): Promise<void> {
+  if (!elements.tagModal) return;
+
+  editingFavoriteId = favoriteId;
+  const favorites = await loadFavorites();
+  const fav = favorites.find((f) => f.id === favoriteId);
+
+  if (!fav) return;
+
+  // Show current tags
+  renderCurrentTags(fav.tags || []);
+
+  // Show suggested tags
+  const allTags = await getAllTags();
+  const currentTags = new Set(fav.tags || []);
+  const suggestions = allTags.filter((t) => !currentTags.has(t));
+  renderSuggestedTags(suggestions);
+
+  elements.newTagInput.value = '';
+  elements.tagModal.classList.remove('hidden');
+}
+
+function closeTagModal(): void {
+  elements.tagModal?.classList.add('hidden');
+  editingFavoriteId = null;
+  refreshFavoritesEnhanced();
+}
+
+function renderCurrentTags(tags: string[]): void {
+  if (!elements.currentTags) return;
+
+  // Clear existing
+  while (elements.currentTags.firstChild) {
+    elements.currentTags.removeChild(elements.currentTags.firstChild);
+  }
+
+  for (const tag of tags) {
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'current-tag';
+    tagSpan.textContent = tag;
+
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'remove-tag';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => handleRemoveTag(tag));
+
+    tagSpan.appendChild(removeBtn);
+    elements.currentTags.appendChild(tagSpan);
+  }
+}
+
+function renderSuggestedTags(tags: string[]): void {
+  if (!elements.suggestedTags) return;
+
+  // Clear existing
+  while (elements.suggestedTags.firstChild) {
+    elements.suggestedTags.removeChild(elements.suggestedTags.firstChild);
+  }
+
+  for (const tag of tags.slice(0, 10)) {  // Show max 10 suggestions
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'suggested-tag';
+    tagSpan.textContent = tag;
+    tagSpan.addEventListener('click', () => handleAddSuggestedTag(tag));
+    elements.suggestedTags.appendChild(tagSpan);
+  }
+}
+
+async function handleAddTag(): Promise<void> {
+  if (!editingFavoriteId) return;
+
+  const tag = elements.newTagInput.value.trim().toLowerCase();
+  if (!tag) return;
+
+  await addTags(editingFavoriteId, [tag]);
+  elements.newTagInput.value = '';
+
+  // Refresh the modal
+  await openTagModal(editingFavoriteId);
+}
+
+async function handleAddSuggestedTag(tag: string): Promise<void> {
+  if (!editingFavoriteId) return;
+  await addTags(editingFavoriteId, [tag]);
+  await openTagModal(editingFavoriteId);
+}
+
+async function handleRemoveTag(tag: string): Promise<void> {
+  if (!editingFavoriteId) return;
+  await removeTags(editingFavoriteId, [tag]);
+  await openTagModal(editingFavoriteId);
+}
+
+// Update applyRoleFiltering to include new sections
+function applyRoleFilteringEnhanced(): void {
+  const visibility = ROLE_VISIBILITY[currentRole];
+
+  // Filter documents by kind
+  const docItems = elements.documentsList.querySelectorAll('.doc-item');
+  docItems.forEach((item) => {
+    const kind = (item as HTMLElement).dataset.kind as DocKind;
+    const visible = isDocKindVisible(kind, visibility);
+    (item as HTMLElement).style.display = visible ? '' : 'none';
+  });
+
+  // Show/hide contacts section
+  elements.contactsSection.style.display = visibility.serviceContacts ? '' : 'none';
+
+  // Enhanced sections
+  if (elements.pcfSection) {
+    elements.pcfSection.style.display = visibility.pcfCard ? '' : 'none';
+  }
+
+  if (elements.sparepartsSection) {
+    elements.sparepartsSection.style.display = visibility.spareParts ? '' : 'none';
+  }
+
+  if (elements.submodelsSection) {
+    elements.submodelsSection.style.display = visibility.submodelExplorer ? '' : 'none';
+  }
+
+  if (elements.btnCompliance) {
+    elements.btnCompliance.style.display = visibility.complianceChecklist ? '' : 'none';
+  }
+}
+
+// Override the original refreshFavorites to use enhanced version
+async function refreshFavorites(): Promise<void> {
+  await refreshFavoritesEnhanced();
+}
+
+// Override applyRoleFiltering to use enhanced version
+function applyRoleFiltering(): void {
+  applyRoleFilteringEnhanced();
 }
 
 // Initialize on load

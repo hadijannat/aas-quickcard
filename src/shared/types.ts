@@ -6,6 +6,103 @@ export type AasSource = {
   capturedAt: number;
 };
 
+// ====== New Types for Enhanced Features ======
+
+// Lifecycle phase of an asset
+export type LifecyclePhase =
+  | 'development'
+  | 'production'
+  | 'operation'
+  | 'maintenance'
+  | 'disposal'
+  | 'unknown';
+
+// Submodel element type classification
+export type SubmodelElementType =
+  | 'Property'
+  | 'MultiLanguageProperty'
+  | 'Range'
+  | 'Blob'
+  | 'File'
+  | 'ReferenceElement'
+  | 'SubmodelElementCollection'
+  | 'SubmodelElementList'
+  | 'Entity'
+  | 'BasicEventElement'
+  | 'Operation'
+  | 'Capability'
+  | 'AnnotatedRelationshipElement'
+  | 'RelationshipElement';
+
+// Submodel element with basic info
+export type SubmodelElement = {
+  idShort: string;
+  modelType: SubmodelElementType;
+  value?: string | number | boolean;
+  semanticId?: string;
+};
+
+// Submodel information
+export type SubmodelInfo = {
+  idShort: string;
+  id?: string;
+  semanticId?: string;
+  templateName?: string;  // e.g., "IDTA-02006 Digital Nameplate"
+  templateVersion?: string;
+  elementCount: number;
+  elements?: SubmodelElement[];
+};
+
+// Product Carbon Footprint data
+export type PcfData = {
+  co2Equivalent?: number;
+  unit?: string;  // kg CO2e, g CO2e, etc.
+  calculationMethod?: string;
+  scope?: string;  // Scope 1, 2, 3, or combined
+  validFrom?: string;
+  validTo?: string;
+  productLifecycleStage?: string;
+  geographicScope?: string;
+};
+
+// Spare part category
+export type SparePartCategory = 'wear' | 'consumable' | 'replacement' | 'other';
+
+// Spare part information
+export type SparePart = {
+  partNumber: string;
+  description?: string;
+  manufacturerPartNumber?: string;
+  category: SparePartCategory;
+  quantity?: number;
+  unit?: string;
+  leadTime?: string;
+  supplier?: string;
+};
+
+// Compliance check result
+export type ComplianceCheck = {
+  requirement: string;
+  description?: string;
+  present: boolean;
+  source?: string;  // Which submodel/property satisfies this
+  mandatory: boolean;
+};
+
+// Compliance profile type
+export type ComplianceProfileType = 'ce-marking' | 'reach' | 'rohs' | 'dpp';
+
+// Compliance profile result
+export type ComplianceResult = {
+  profileType: ComplianceProfileType;
+  profileName: string;
+  checks: ComplianceCheck[];
+  passedCount: number;
+  totalCount: number;
+  mandatoryPassed: number;
+  mandatoryTotal: number;
+};
+
 // Document classification
 export type DocKind = 'manual' | 'safety' | 'datasheet' | 'certificate' | 'other';
 
@@ -36,6 +133,8 @@ export type AasAsset = {
   assetId?: string;
   yearOfConstruction?: string;
   location?: string;
+  commissioningDate?: string;
+  lastServiceDate?: string;
 };
 
 // Complete snapshot of parsed AAS data
@@ -47,6 +146,11 @@ export type AasSnapshot = {
   asset: AasAsset;
   docs: AasDocument[];
   contacts: AasContact[];
+  // Enhanced features
+  submodels?: SubmodelInfo[];
+  pcf?: PcfData;
+  lifecyclePhase?: LifecyclePhase;
+  spareParts?: SparePart[];
 };
 
 // User role for filtering visible content
@@ -58,6 +162,11 @@ export type FavoriteAsset = {
   snapshot: AasSnapshot;
   pinnedAt: number;
   nickname?: string;
+  // Enhanced features
+  tags?: string[];
+  category?: string;
+  notes?: string;
+  searchableText?: string;  // Pre-computed for fast search
 };
 
 // Custom field mapping configuration
@@ -94,6 +203,11 @@ export type RoleVisibility = {
   certificates: boolean;
   manuals: boolean;
   orderingInfo: boolean;
+  // Enhanced features
+  pcfCard: boolean;
+  spareParts: boolean;
+  complianceChecklist: boolean;
+  submodelExplorer: boolean;
 };
 
 export const ROLE_VISIBILITY: Record<UserRole, RoleVisibility> = {
@@ -103,6 +217,10 @@ export const ROLE_VISIBILITY: Record<UserRole, RoleVisibility> = {
     certificates: false,
     manuals: true,
     orderingInfo: false,
+    pcfCard: true,           // PCF visible to all (regulatory importance)
+    spareParts: false,
+    complianceChecklist: false,
+    submodelExplorer: true,  // All roles can explore submodels
   },
   maintenance: {
     safetyDocs: true,
@@ -110,6 +228,10 @@ export const ROLE_VISIBILITY: Record<UserRole, RoleVisibility> = {
     certificates: false,
     manuals: true,
     orderingInfo: false,
+    pcfCard: true,
+    spareParts: true,        // Maintenance needs spare parts
+    complianceChecklist: false,
+    submodelExplorer: true,
   },
   quality: {
     safetyDocs: true,
@@ -117,6 +239,10 @@ export const ROLE_VISIBILITY: Record<UserRole, RoleVisibility> = {
     certificates: true,
     manuals: false,
     orderingInfo: false,
+    pcfCard: true,
+    spareParts: false,
+    complianceChecklist: true,  // Quality needs compliance
+    submodelExplorer: true,
   },
   procurement: {
     safetyDocs: false,
@@ -124,5 +250,9 @@ export const ROLE_VISIBILITY: Record<UserRole, RoleVisibility> = {
     certificates: false,
     manuals: false,
     orderingInfo: true,
+    pcfCard: true,
+    spareParts: true,        // Procurement needs spare parts for ordering
+    complianceChecklist: true,
+    submodelExplorer: true,
   },
 };

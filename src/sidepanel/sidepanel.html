@@ -67,7 +67,10 @@
     <main id="main-content" class="main-content hidden">
       <!-- Asset Card -->
       <section id="asset-card" class="card asset-card">
-        <h2 id="asset-name" class="asset-name">-</h2>
+        <div class="asset-header">
+          <h2 id="asset-name" class="asset-name">-</h2>
+          <span id="lifecycle-badge" class="lifecycle-badge hidden" title="Lifecycle Phase">-</span>
+        </div>
         <div class="asset-details">
           <div class="detail-row">
             <span class="detail-label">Manufacturer:</span>
@@ -95,7 +98,57 @@
           <button id="btn-qr" class="small-btn" title="Generate QR Label">
             📱 QR Label
           </button>
+          <button id="btn-compliance" class="small-btn" title="Compliance Checklist">
+            ✓ Compliance
+          </button>
         </div>
+      </section>
+
+      <!-- Submodel Explorer -->
+      <section id="submodels-section" class="card hidden">
+        <div class="section-header collapsible" id="submodels-header">
+          <h3 class="section-title">🧩 Submodels (<span id="submodels-count">0</span>)</h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <ul id="submodels-list" class="submodels-list">
+          <!-- Submodels populated dynamically -->
+        </ul>
+      </section>
+
+      <!-- PCF Card -->
+      <section id="pcf-section" class="card pcf-card hidden">
+        <h3 class="section-title">🌱 Carbon Footprint</h3>
+        <div class="pcf-content">
+          <div class="pcf-value-display">
+            <span id="pcf-value" class="pcf-value">-</span>
+            <span id="pcf-unit" class="pcf-unit">kg CO₂e</span>
+          </div>
+          <div class="pcf-badges">
+            <span id="pcf-scope" class="pcf-badge hidden">Scope</span>
+            <span id="pcf-method" class="pcf-badge hidden">Method</span>
+            <span id="pcf-validity" class="pcf-badge hidden">Valid</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Spare Parts Section -->
+      <section id="spareparts-section" class="card hidden">
+        <div class="section-header">
+          <h3 class="section-title">🔧 Spare Parts (<span id="spareparts-count">0</span>)</h3>
+          <button id="btn-copy-parts" class="small-btn" title="Copy Parts List">
+            📋 Copy List
+          </button>
+        </div>
+        <div class="spareparts-filter">
+          <button class="filter-btn active" data-category="all">All</button>
+          <button class="filter-btn" data-category="wear">Wear</button>
+          <button class="filter-btn" data-category="consumable">Consumable</button>
+          <button class="filter-btn" data-category="replacement">Replacement</button>
+        </div>
+        <ul id="spareparts-list" class="spareparts-list">
+          <!-- Spare parts populated dynamically -->
+        </ul>
+        <p id="no-spareparts" class="empty-message hidden">No spare parts found</p>
       </section>
 
       <!-- Documents Section -->
@@ -129,7 +182,29 @@
 
     <!-- Favorites Panel -->
     <section id="favorites-section" class="card favorites-section hidden">
-      <h3 class="section-title">⭐ Favorites</h3>
+      <div class="favorites-header">
+        <h3 class="section-title">⭐ Favorites</h3>
+        <div class="storage-indicator" id="storage-indicator" title="Storage usage">
+          <div class="storage-bar">
+            <div class="storage-fill" id="storage-fill"></div>
+          </div>
+          <span id="storage-text" class="storage-text">0%</span>
+        </div>
+      </div>
+      <div class="favorites-toolbar">
+        <input type="search" id="favorites-search" class="search-input favorites-search" placeholder="Search favorites...">
+        <select id="favorites-category" class="category-select">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div id="favorites-tags" class="favorites-tags">
+        <!-- Tags populated dynamically -->
+      </div>
+      <div class="compare-toolbar hidden" id="compare-toolbar">
+        <span id="compare-count">0 selected</span>
+        <button id="btn-compare" class="small-btn" disabled>Compare</button>
+        <button id="btn-clear-selection" class="small-btn">Clear</button>
+      </div>
       <ul id="favorites-list" class="favorites-list">
         <!-- Favorites populated dynamically -->
       </ul>
@@ -156,6 +231,67 @@
         <div class="modal-actions">
           <button id="btn-qr-close" class="action-btn">Close</button>
           <button id="btn-qr-download" class="action-btn primary">Download</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compliance Modal -->
+    <div id="compliance-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h3>Compliance Checklist</h3>
+          <select id="compliance-profile-select" class="profile-select">
+            <option value="ce-marking">CE Marking</option>
+            <option value="reach">REACH</option>
+            <option value="rohs">RoHS</option>
+            <option value="dpp">Digital Product Passport</option>
+          </select>
+        </div>
+        <div id="compliance-summary" class="compliance-summary">
+          <!-- Summary populated dynamically -->
+        </div>
+        <div id="compliance-checklist" class="compliance-checklist">
+          <!-- Checklist populated dynamically -->
+        </div>
+        <div class="modal-actions">
+          <button id="btn-compliance-close" class="action-btn">Close</button>
+          <button id="btn-compliance-export" class="action-btn primary">Export Report</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="comparison-modal" class="modal hidden">
+      <div class="modal-content modal-wide">
+        <h3>Asset Comparison</h3>
+        <div id="comparison-table-container" class="comparison-table-container">
+          <!-- Comparison table populated dynamically -->
+        </div>
+        <div class="modal-actions">
+          <button id="btn-comparison-close" class="action-btn">Close</button>
+          <button id="btn-comparison-copy" class="action-btn primary">Copy Table</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tag Edit Modal -->
+    <div id="tag-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Edit Tags</h3>
+        <div id="tag-edit-container" class="tag-edit-container">
+          <div id="current-tags" class="current-tags">
+            <!-- Current tags shown as pills -->
+          </div>
+          <div class="tag-input-wrapper">
+            <input type="text" id="new-tag-input" class="tag-input" placeholder="Add tag...">
+            <button id="btn-add-tag" class="small-btn">Add</button>
+          </div>
+          <div id="suggested-tags" class="suggested-tags">
+            <!-- Suggested tags shown here -->
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-tag-close" class="action-btn">Done</button>
         </div>
       </div>
     </div>
