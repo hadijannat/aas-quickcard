@@ -1,4 +1,5 @@
 import type { AasSnapshot, UserRole, ExtensionMessage, RoleVisibility, DocKind, AasDocument, AasContact, SubmodelInfo, SparePart, ComplianceProfileType, LifecyclePhase } from '../shared/types';
+import { safeWindowOpen, createTrackedBlobUrl, sanitizePhoneNumber, isValidEmail } from '../shared/url-utils';
 import { ROLE_VISIBILITY } from '../shared/types';
 import { loadSettings, setCurrentRole, loadFavorites, addFavorite, removeFavorite, addTags, removeTags, getAllTags, getAllCategories, getStorageUsage, formatBytes, type FavoriteAsset } from '../shared/storage';
 import { createSnapshotFromPaste, createSnapshotFromPage } from '../parser/normalize';
@@ -6,7 +7,7 @@ import { parseFile } from '../parser/aasx-parser';
 import { formatPcfValue } from '../parser/pcfExtractor';
 import { formatSparePartsList } from '../parser/sparePartsExtractor';
 import { runComplianceCheck, generateComplianceReport, calculateComplianceScore, getComplianceStatusLabel } from '../compliance/checklistGenerator';
-import { compareAssets, generateComparisonTable, generateComparisonMarkdown } from './comparison';
+import { compareAssets, generateComparisonTableDOM, generateComparisonMarkdown } from './comparison';
 import { searchFavorites } from '../shared/search';
 
 // State
@@ -508,15 +509,30 @@ function createContactActionButton(contact: AasContact): HTMLButtonElement {
 
 function handleContactAction(contact: AasContact): void {
   switch (contact.type) {
-    case 'phone':
-      window.open(`tel:${contact.value}`, '_blank');
+    case 'phone': {
+      const sanitized = sanitizePhoneNumber(contact.value);
+      if (sanitized) {
+        safeWindowOpen(`tel:${sanitized}`);
+      } else {
+        showError('Invalid phone number');
+      }
       break;
-    case 'email':
-      window.open(`mailto:${contact.value}`, '_blank');
+    }
+    case 'email': {
+      if (isValidEmail(contact.value)) {
+        safeWindowOpen(`mailto:${contact.value}`);
+      } else {
+        showError('Invalid email address');
+      }
       break;
-    case 'url':
-      window.open(contact.value.startsWith('http') ? contact.value : `https://${contact.value}`, '_blank');
+    }
+    case 'url': {
+      const url = contact.value.startsWith('http') ? contact.value : `https://${contact.value}`;
+      if (!safeWindowOpen(url)) {
+        showError('URL blocked for security reasons');
+      }
       break;
+    }
     default:
       copyToClipboard(contact.value);
       showToast('Copied to clipboard');
@@ -526,19 +542,36 @@ function handleContactAction(contact: AasContact): void {
 // Open document
 function openDocument(doc: AasDocument): void {
   if (doc.blob) {
-    // Create blob URL for embedded files
-    const url = URL.createObjectURL(doc.blob);
-    window.open(url, '_blank');
-  } else if (doc.url.startsWith('http') || doc.url.startsWith('//')) {
-    window.open(doc.url, '_blank');
+    // Create blob URL with auto-revoke for embedded files
+    const url = createTrackedBlobUrl(doc.blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
   } else {
-    // Relative URL - try to resolve against source
-    if (currentSnapshot?.source.url) {
-      const base = new URL(currentSnapshot.source.url);
-      const resolved = new URL(doc.url, base);
-      window.open(resolved.href, '_blank');
-    } else {
-      showError('Cannot resolve document URL');
+    let targetUrl = doc.url;
+
+    // Handle relative URLs
+    if (!doc.url.startsWith('http') && !doc.url.startsWith('//')) {
+      if (currentSnapshot?.source.url) {
+        try {
+          const base = new URL(currentSnapshot.source.url);
+          targetUrl = new URL(doc.url, base).href;
+        } catch {
+          showError('Cannot resolve document URL');
+          return;
+        }
+      } else {
+        showError('Cannot resolve document URL');
+        return;
+      }
+    }
+
+    // Handle protocol-relative URLs
+    if (targetUrl.startsWith('//')) {
+      targetUrl = 'https:' + targetUrl;
+    }
+
+    // Validate and open
+    if (!safeWindowOpen(targetUrl)) {
+      showError('URL blocked for security reasons');
     }
   }
 }
@@ -727,7 +760,7 @@ function showToast(message: string): void {
 }
 
 function showHelp(): void {
-  window.open('https://github.com/hadijannat/aas-quickcard#readme', '_blank');
+  window.open('https://github.com/hadijannat/aas-quickcard#readme', '_blank', 'noopener,noreferrer');
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -735,8 +768,14 @@ async function copyToClipboard(text: string): Promise<void> {
 }
 
 function sendMessage(message: ExtensionMessage): Promise<unknown> {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message || 'Message send failed'));
+      } else {
+        resolve(response);
+      }
+    });
   });
 }
 
@@ -1370,11 +1409,13 @@ async function openComparisonModal(): Promise<void> {
   const selected = allFavorites.filter((f) => selectedFavorites.has(f.id));
 
   const rows = compareAssets(selected);
-  const tableHtml = generateComparisonTable(selected, rows);
+  const tableElement = generateComparisonTableDOM(selected, rows);
 
-  // Use safe DOM insertion - the comparison table HTML is generated from our own code
-  // and escapes user content, so this is safe
-  elements.comparisonTableContainer.innerHTML = tableHtml;
+  // Clear and append using safe DOM methods
+  while (elements.comparisonTableContainer.firstChild) {
+    elements.comparisonTableContainer.removeChild(elements.comparisonTableContainer.firstChild);
+  }
+  elements.comparisonTableContainer.appendChild(tableElement);
   elements.comparisonModal.classList.remove('hidden');
 }
 

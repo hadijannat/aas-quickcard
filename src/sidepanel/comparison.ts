@@ -135,6 +135,61 @@ export function generateComparisonTable(
 }
 
 /**
+ * Generate comparison table using DOM methods (XSS-safe)
+ * Returns an HTMLTableElement that can be appended to the DOM
+ */
+export function generateComparisonTableDOM(
+  favorites: FavoriteAsset[],
+  rows: ComparisonRow[]
+): HTMLTableElement {
+  const table = document.createElement('table');
+  table.className = 'comparison-table';
+
+  // Create thead
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+
+  // Property header
+  const propertyTh = document.createElement('th');
+  propertyTh.textContent = 'Property';
+  headerRow.appendChild(propertyTh);
+
+  // Asset name headers
+  for (const fav of favorites) {
+    const th = document.createElement('th');
+    th.textContent = fav.nickname || fav.snapshot.asset.displayName || 'Asset';
+    headerRow.appendChild(th);
+  }
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // Create tbody
+  const tbody = document.createElement('tbody');
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+
+    // Property name cell
+    const nameTd = document.createElement('td');
+    nameTd.className = 'property-name';
+    nameTd.textContent = row.property;
+    tr.appendChild(nameTd);
+
+    // Value cells
+    for (const val of row.values) {
+      const td = document.createElement('td');
+      td.className = row.isDifferent ? 'diff' : 'match';
+      td.textContent = val || '-';
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+
+  return table;
+}
+
+/**
  * Generate markdown table for copy
  */
 export function generateComparisonMarkdown(

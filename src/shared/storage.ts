@@ -1,4 +1,4 @@
-import type { FavoriteAsset, UserSettings, UserRole, FieldMapping } from './types';
+import type { FavoriteAsset, UserSettings, UserRole, FieldMapping, AasSnapshot } from './types';
 
 // Re-export types for convenience
 export type { FavoriteAsset, UserSettings, UserRole, FieldMapping };
@@ -47,6 +47,87 @@ export const DEFAULT_SETTINGS: UserSettings = {
   fieldMappings: DEFAULT_FIELD_MAPPINGS,
 };
 
+// Storage quota thresholds
+const QUOTA_WARNING_THRESHOLD = 0.8;  // 80%
+const QUOTA_ERROR_THRESHOLD = 0.95;   // 95%
+const MAX_SUBMODEL_ELEMENTS = 50;     // Limit elements stored per submodel
+
+/**
+ * Check storage quota and return status
+ * Warns at 80%, errors at 95%
+ */
+export async function checkStorageQuota(): Promise<{
+  ok: boolean;
+  warning: boolean;
+  percentage: number;
+  message?: string;
+}> {
+  const usage = await getStorageUsage();
+  const ratio = usage.used / usage.total;
+
+  if (ratio >= QUOTA_ERROR_THRESHOLD) {
+    return {
+      ok: false,
+      warning: true,
+      percentage: usage.percentage,
+      message: `Storage nearly full (${usage.percentage}%). Delete some favorites to continue.`,
+    };
+  }
+
+  if (ratio >= QUOTA_WARNING_THRESHOLD) {
+    return {
+      ok: true,
+      warning: true,
+      percentage: usage.percentage,
+      message: `Storage ${usage.percentage}% full. Consider removing old favorites.`,
+    };
+  }
+
+  return { ok: true, warning: false, percentage: usage.percentage };
+}
+
+/**
+ * Trim a snapshot for storage - removes large data that isn't needed for display
+ * - Removes rawText (not needed after parsing)
+ * - Removes blob data from documents (can't serialize Blobs anyway)
+ * - Limits submodel elements to prevent bloat
+ */
+export function trimSnapshotForStorage(snapshot: AasSnapshot): AasSnapshot {
+  // Create a deep copy to avoid mutating the original
+  const trimmed: AasSnapshot = {
+    source: { ...snapshot.source },
+    parseOk: snapshot.parseOk,
+    errors: snapshot.errors ? [...snapshot.errors] : undefined,
+    asset: { ...snapshot.asset },
+    docs: snapshot.docs.map((doc) => ({
+      title: doc.title,
+      url: doc.url,
+      kind: doc.kind,
+      // Explicitly omit blob - can't serialize and takes memory
+    })),
+    contacts: snapshot.contacts.map((c) => ({ ...c })),
+    lifecyclePhase: snapshot.lifecyclePhase,
+    pcf: snapshot.pcf ? { ...snapshot.pcf } : undefined,
+    spareParts: snapshot.spareParts ? snapshot.spareParts.map((p) => ({ ...p })) : undefined,
+    // rawText intentionally omitted - not needed for display
+  };
+
+  // Trim submodels - limit element count to prevent storage bloat
+  if (snapshot.submodels) {
+    trimmed.submodels = snapshot.submodels.map((sm) => ({
+      idShort: sm.idShort,
+      id: sm.id,
+      semanticId: sm.semanticId,
+      templateName: sm.templateName,
+      templateVersion: sm.templateVersion,
+      elementCount: sm.elementCount,
+      elements: sm.elements?.slice(0, MAX_SUBMODEL_ELEMENTS),
+    }));
+  }
+
+  return trimmed;
+}
+
 // Save favorites to chrome.storage.local
 export async function saveFavorites(favorites: FavoriteAsset[]): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEYS.FAVORITES]: favorites });
@@ -60,11 +141,17 @@ export async function loadFavorites(): Promise<FavoriteAsset[]> {
 
 // Add a favorite asset
 export async function addFavorite(snapshot: FavoriteAsset['snapshot'], nickname?: string): Promise<FavoriteAsset> {
+  // Check quota before adding
+  const quota = await checkStorageQuota();
+  if (!quota.ok) {
+    throw new Error(quota.message || 'Storage quota exceeded');
+  }
+
   const favorites = await loadFavorites();
   const id = crypto.randomUUID();
   const favorite: FavoriteAsset = {
     id,
-    snapshot,
+    snapshot: trimSnapshotForStorage(snapshot),  // Trim for storage
     pinnedAt: Date.now(),
     nickname,
   };
@@ -155,11 +242,17 @@ export async function addFavoriteEnhanced(
   snapshot: FavoriteAsset['snapshot'],
   options?: { nickname?: string; tags?: string[]; category?: string; notes?: string }
 ): Promise<FavoriteAsset> {
+  // Check quota before adding
+  const quota = await checkStorageQuota();
+  if (!quota.ok) {
+    throw new Error(quota.message || 'Storage quota exceeded');
+  }
+
   const favorites = await loadFavorites();
   const id = crypto.randomUUID();
   const favorite: FavoriteAsset = {
     id,
-    snapshot,
+    snapshot: trimSnapshotForStorage(snapshot),  // Trim for storage
     pinnedAt: Date.now(),
     nickname: options?.nickname,
     tags: options?.tags,

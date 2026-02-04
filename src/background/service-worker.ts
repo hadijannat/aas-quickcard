@@ -1,7 +1,4 @@
-import type { ExtensionMessage, AasSnapshot } from '../shared/types';
-
-// Current snapshot state (in-memory for the session)
-let currentSnapshot: AasSnapshot | null = null;
+import type { ExtensionMessage } from '../shared/types';
 
 // Handle extension icon click - open side panel
 chrome.action.onClicked.addListener(async (tab) => {
@@ -27,15 +24,6 @@ async function handleMessage(
   switch (message.type) {
     case 'EXTRACT_FROM_PAGE':
       await handleExtractFromPage(sendResponse);
-      break;
-
-    case 'EXTRACTION_RESULT':
-      currentSnapshot = message.payload as AasSnapshot;
-      sendResponse({ success: true });
-      break;
-
-    case 'GET_CURRENT_SNAPSHOT':
-      sendResponse({ snapshot: currentSnapshot });
       break;
 
     default:
@@ -80,23 +68,15 @@ async function handleExtractFromPage(sendResponse: (response: unknown) => void):
 
 // This function is injected into the page to extract AAS JSON
 function extractAasFromPage(): { rawJson?: string; error?: string } {
+  const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB limit
+
   try {
-    const bodyText = document.body.innerText;
-
-    // Try to find JSON in the page
-    // First, check if the entire body is JSON
-    try {
-      JSON.parse(bodyText);
-      return { rawJson: bodyText };
-    } catch {
-      // Not pure JSON, try to find JSON blocks
-    }
-
-    // Look for JSON in <pre> or <code> tags
+    // FIRST: Check <pre> and <code> elements - most likely to have JSON
+    // and avoids processing large page bodies unnecessarily
     const preElements = document.querySelectorAll('pre, code');
     for (const el of preElements) {
       const text = el.textContent?.trim();
-      if (text) {
+      if (text && text.length > 10) {  // Skip tiny elements
         try {
           JSON.parse(text);
           return { rawJson: text };
@@ -104,6 +84,25 @@ function extractAasFromPage(): { rawJson?: string; error?: string } {
           // Not valid JSON, continue
         }
       }
+    }
+
+    // Now try the full body
+    const bodyText = document.body.innerText;
+
+    // Check size limit before processing
+    if (bodyText.length > MAX_BODY_SIZE) {
+      return {
+        error: `Page content too large (${(bodyText.length / 1024 / 1024).toFixed(1)}MB). Maximum supported size is 5MB.`
+      };
+    }
+
+    // Try to find JSON in the page
+    // Check if the entire body is JSON
+    try {
+      JSON.parse(bodyText);
+      return { rawJson: bodyText };
+    } catch {
+      // Not pure JSON, try to find JSON blocks
     }
 
     // Try to find JSON-like content with regex

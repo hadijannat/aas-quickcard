@@ -140,7 +140,7 @@ export type AasAsset = {
 // Complete snapshot of parsed AAS data
 export type AasSnapshot = {
   source: AasSource;
-  rawText: string;
+  rawText?: string;  // Optional - trimmed snapshots won't have this
   parseOk: boolean;
   errors?: string[];
   asset: AasAsset;
@@ -187,9 +187,7 @@ export type UserSettings = {
 // Message types for chrome.runtime messaging
 export type MessageType =
   | 'EXTRACT_FROM_PAGE'
-  | 'EXTRACTION_RESULT'
-  | 'OPEN_SIDE_PANEL'
-  | 'GET_CURRENT_SNAPSHOT';
+  | 'OPEN_SIDE_PANEL';
 
 export type ExtensionMessage = {
   type: MessageType;
