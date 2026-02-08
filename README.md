@@ -2,7 +2,7 @@
 
 **Turn complex Asset Administration Shell data into actionable equipment cards.**
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-coming%20soon-blue?logo=google-chrome)](https://chrome.google.com/webstore)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/ihfcmhcfpmklfgfhipfdbgdpnchcmmim?logo=google-chrome&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/aas-quickcard/ihfcmhcfpmklfgfhipfdbgdpnchcmmim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange)](https://developer.chrome.com/docs/extensions/mv3/)
 
@@ -71,7 +71,7 @@ Automatically detects and extracts data from standard IDTA templates:
 
 ### Chrome Web Store
 
-Coming soon.
+[Install AAS QuickCard](https://chromewebstore.google.com/detail/aas-quickcard/ihfcmhcfpmklfgfhipfdbgdpnchcmmim) from the Chrome Web Store.
 
 ### From Source
 

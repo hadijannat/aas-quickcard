@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-AAS QuickCard is a Chrome extension for displaying Asset Administration Shell (AAS) data in a human-friendly format. It extracts asset information from AASX files, JSON APIs, and web pages, presenting it in a role-filtered side panel.
+AAS QuickCard is a Chrome extension published on the [Chrome Web Store](https://chromewebstore.google.com/detail/aas-quickcard/ihfcmhcfpmklfgfhipfdbgdpnchcmmim) (ID: `ihfcmhcfpmklfgfhipfdbgdpnchcmmim`) for displaying Asset Administration Shell (AAS) data in a human-friendly format. It extracts asset information from AASX files, JSON APIs, and web pages, presenting it in a role-filtered side panel.
 
 ## Tech Stack
 
